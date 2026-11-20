@@ -10,11 +10,12 @@
 # false), then records layoutApplied on its bar entry so it never rearranges
 # the bar again on its own.
 #
-# Before the first change it saves the bar as it was, minus Taskbar itself,
-# to $XDG_STATE_HOME/0xesmail.taskbar/bar-before-layout.json. That copy is
-# kept until --restore uses it, so applying again never overwrites it.
-# --restore puts back only the "bar" part of shell.json, and uninstall.sh
-# runs it. shell.json is backed up before every change.
+# Before the first change of each installation it saves the bar as it was,
+# minus Taskbar itself, to $XDG_STATE_HOME/0xesmail.taskbar/bar-before-layout.json,
+# replacing any copy an earlier installation left. Re-applying within the
+# same installation keeps that copy. --restore puts back only the "bar" part
+# of shell.json; uninstall.sh runs it after checking the copy belongs to the
+# installation being removed. shell.json is backed up before every change.
 set -uo pipefail
 
 ID="0xesmail.taskbar"
@@ -97,26 +98,38 @@ fi
 
 backup_config || { echo "error: could not back up $CONFIG; leaving the bar alone" >&2; exit 1; }
 
-# Remember the bar as it was before Taskbar touched it, once. Uninstalling
-# promises to put it back, so without a good copy nothing below may run.
+# The restore point: the bar as it was before this installation of Taskbar
+# rearranged it. Uninstalling promises to put it back, so without a good copy
+# nothing below may run.
+#
+# It belongs to one installation. The bar entry marked layoutApplied is this
+# installation having already saved it, so that copy is kept (a --force
+# re-apply must not overwrite the original). Any other run is a new
+# activation, after a fresh install or a reinstall, and saves the bar as it
+# is now, replacing whatever an earlier installation left behind. Restoring
+# can then never reach back past the current installation.
+#
 # Written to a temp file and checked before it takes the real name, so a
 # failure never leaves a half-written restore point behind.
-if [[ -f $SNAPSHOT ]]; then
+save_snapshot() {
+  local tmp=""
+  if mkdir -p "$STATE_DIR" &&
+     tmp=$(mktemp "$STATE_DIR/.bar-before-layout.XXXXXX") &&
+     jq --arg id "$ID" ".bar // {} | $WITHOUT_TASKBAR" "$CONFIG" >"$tmp" &&
+     is_bar_layout "$tmp" &&
+     mv "$tmp" "$SNAPSHOT"; then
+    return 0
+  fi
+  [[ -n $tmp ]] && rm -f "$tmp"
+  return 1
+}
+
+if [[ $(entry_value layoutApplied) == "true" && -f $SNAPSHOT ]]; then
   is_bar_layout "$SNAPSHOT" ||
     { echo "error: the saved bar at $SNAPSHOT is damaged; leaving the bar alone" >&2; exit 1; }
 else
-  tmp_snapshot=""
-  if mkdir -p "$STATE_DIR" &&
-     tmp_snapshot=$(mktemp "$STATE_DIR/.bar-before-layout.XXXXXX") &&
-     jq --arg id "$ID" ".bar // {} | $WITHOUT_TASKBAR" "$CONFIG" >"$tmp_snapshot" &&
-     is_bar_layout "$tmp_snapshot" &&
-     mv "$tmp_snapshot" "$SNAPSHOT"; then
-    :
-  else
-    [[ -n $tmp_snapshot ]] && rm -f "$tmp_snapshot"
-    echo "error: could not save the bar to $SNAPSHOT; leaving the bar alone" >&2
-    exit 1
-  fi
+  save_snapshot ||
+    { echo "error: could not save the bar to $SNAPSHOT; leaving the bar alone" >&2; exit 1; }
 fi
 
 omarchy bar position bottom

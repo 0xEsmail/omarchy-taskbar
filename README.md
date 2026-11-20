@@ -40,14 +40,21 @@ the files to load your changes.
 ~/.config/omarchy/plugins/0xesmail.taskbar/uninstall.sh
 ```
 
-This removes Taskbar and **puts your bar back the way it was** before Taskbar
-set up the Windows layout. It asks first, because bar changes you made since
-installing would be undone. Pass `--keep-layout` to leave the bar as it is,
-or `--yes` to skip the question. Run without a terminal (from a script or a
-launcher), it can't ask, so it leaves the bar alone unless you pass `--yes`.
+This removes Taskbar and can **put your bar back the way it was** before
+this installation set up the Windows layout. It asks first, because bar
+changes you made since installing would be undone:
 
-If the bar can't be saved when Taskbar first loads, Taskbar leaves your
-layout untouched instead of changing it without a way back.
+| Answer or option | What happens |
+|---|---|
+| Enter, `y`, or `--yes` | Bar restored, Taskbar removed |
+| `n`, or `--keep-layout` | Bar left as it is, Taskbar removed |
+| No terminal to ask in, no answer, or an unclear answer | **Nothing changes.** Run again with `--yes` or `--keep-layout` |
+
+Only the bar saved by the installation you're removing is ever restored. A
+reinstall saves your bar afresh, so uninstalling never brings back a layout
+from an earlier installation. If the bar can't be saved when Taskbar first
+loads, Taskbar leaves your layout untouched instead of changing it without a
+way back.
 
 Use this rather than `omarchy plugin remove`, which only deletes the files
 and can't restore your bar.
@@ -62,9 +69,9 @@ The first time Taskbar loads, it sets your bar up Windows 11 style:
 - widgets that sat around the clock move to the right side
 - the indicator icons stay visible instead of showing only on hover
 
-This happens **once**. Before it changes anything, Taskbar saves your bar
-as it was to `~/.local/state/0xesmail.taskbar/bar-before-layout.json`, so
-uninstalling can put it back. `shell.json` is also backed up
+This happens **once** per installation. Before it changes anything, Taskbar
+saves your bar as it was to `~/.local/state/0xesmail.taskbar/bar-before-layout.json`,
+so uninstalling can put it back. `shell.json` is also backed up
 (`shell.json.bak.<time>`). After that Taskbar never moves anything on its
 own, so you can rearrange freely.
 
