@@ -1,0 +1,9 @@
+# Editor / agent folders
+.claude/
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+*~
+*.swp

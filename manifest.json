@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "id": "0xesmail.taskbar",
+  "name": "Taskbar",
+  "version": "1.0.0",
+  "author": "0xEsmail",
+  "license": "MIT",
+  "homepage": "https://github.com/0xEsmail/omarchy-taskbar",
+  "description": "A Windows-style taskbar inside the Omarchy bar: pinned and running apps, click to switch or minimize, live window previews, jump-list menus, and no cursor jump when you click.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Taskbar.qml"
+  },
+  "barWidget": {
+    "displayName": "Taskbar",
+    "description": "Pinned and running apps; click to switch, hover to preview",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "defaults": {
+      "pinned": [],
+      "labels": "focused",
+      "maxLabelWidth": 180,
+      "filter": "all",
+      "clickToMinimize": true,
+      "previews": true,
+      "showAppsButton": true,
+      "appsCommand": "omarchy-shell omarchy.dock apps",
+      "autoLayout": true
+    },
+    "schema": [
+      {
+        "key": "labels",
+        "type": "enum",
+        "label": "Window titles",
+        "description": "Show titles next to icons: none, focused app only, or every running app.",
+        "options": ["none", "focused", "all"],
+        "defaultValue": "focused"
+      },
+      {
+        "key": "maxLabelWidth",
+        "type": "integer",
+        "min": 60,
+        "max": 600,
+        "step": 10,
+        "label": "Max title width",
+        "description": "Longest a title may get before it is cut off, in pixels.",
+        "defaultValue": 180
+      },
+      {
+        "key": "filter",
+        "type": "enum",
+        "label": "Show windows from",
+        "description": "all: every workspace. monitor: this monitor only. workspace: the visible workspace only.",
+        "options": ["all", "monitor", "workspace"],
+        "defaultValue": "all"
+      },
+      {
+        "key": "clickToMinimize",
+        "type": "boolean",
+        "label": "Click focused app to minimize",
+        "description": "Clicking an app whose only window already has focus minimizes it, like Windows.",
+        "defaultValue": true
+      },
+      {
+        "key": "previews",
+        "type": "boolean",
+        "label": "Live window previews",
+        "description": "Hovering a running app shows live thumbnails of its windows.",
+        "defaultValue": true
+      },
+      {
+        "key": "showAppsButton",
+        "type": "boolean",
+        "label": "Apps button",
+        "description": "A start-style button that opens the app grid. Right-click it for taskbar settings.",
+        "defaultValue": true
+      },
+      {
+        "key": "autoLayout",
+        "type": "boolean",
+        "label": "Windows layout on first run",
+        "description": "The first time Taskbar loads, move the bar to the bottom, center Taskbar and put the clock in the corner. Happens once; shell.json is backed up first.",
+        "defaultValue": true
+      }
+    ]
+  }
+}
