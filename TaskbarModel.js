@@ -141,6 +141,20 @@ function stepWindow(windows, step) {
   return ((current + step) % list.length + list.length) % list.length
 }
 
+// The slot a dragged button would land in: the first slot whose center lies
+// past the pointer, counted once the dragged slot has left its place.
+// centers are the slots' centers along the bar, in order.
+function dropIndex(centers, fromIndex, pointer) {
+  var count = (centers || []).length
+  if (count === 0) return fromIndex
+  var target = count
+  for (var i = 0; i < count; i++) {
+    if (pointer < centers[i]) { target = i; break }
+  }
+  if (target > fromIndex) target -= 1
+  return Math.max(0, Math.min(count - 1, target))
+}
+
 // A terminal app's window carries the app id its launcher gave the terminal,
 // which no desktop entry names as its class. The entry that passes that app
 // id claims it, and so does a terminal entry for the command Omarchy's TUI
@@ -184,6 +198,7 @@ if (typeof module !== "undefined") {
     pickWindow: pickWindow,
     clickAction: clickAction,
     stepWindow: stepWindow,
+    dropIndex: dropIndex,
     claimingEntryId: claimingEntryId,
     hyprAddress: hyprAddress
   }

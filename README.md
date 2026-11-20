@@ -11,6 +11,7 @@ running apps sit side by side, so you get a dock without adding a second bar.
 - **Click to switch.** Click an app to open it or focus it. Click again to cycle its windows. Click the focused app to minimize it, like Windows.
 - **Live window previews** on hover. Click one to switch to it, or ✕ / middle-click to close it.
 - **Jump lists** on right-click: every window, new window, pin/unpin, move left/right, move to this workspace, minimize/restore, close / close all.
+- **Drag to reorder.** Pinned order is saved, and a drag can't knock Taskbar off the bar.
 - **No cursor jump.** Hyprland normally warps the pointer onto a window it focuses. Taskbar switches that off for the instant of the click, so your mouse stays where you clicked.
 - **Status at a glance:** a short line under running apps, a long accent line under the focused one, a window-count badge, red for apps that want attention, and a pulse while an app starts.
 - **Apps button (⊞):** left-click opens the app grid, right-click opens Taskbar settings.
@@ -42,7 +43,11 @@ the files to load your changes.
 This removes Taskbar and **puts your bar back the way it was** before Taskbar
 set up the Windows layout. It asks first, because bar changes you made since
 installing would be undone. Pass `--keep-layout` to leave the bar as it is,
-or `--yes` to skip the question.
+or `--yes` to skip the question. Run without a terminal (from a script or a
+launcher), it can't ask, so it leaves the bar alone unless you pass `--yes`.
+
+If the bar can't be saved when Taskbar first loads, Taskbar leaves your
+layout untouched instead of changing it without a way back.
 
 Use this rather than `omarchy plugin remove`, which only deletes the files
 and can't restore your bar.
@@ -81,14 +86,22 @@ Taskbar is a widget, and widgets can't rearrange the bar directly, so
 | **Click** an app | Not running: launch it. Running: focus it, or cycle its windows. Already focused: minimize it |
 | **Middle-click** or **Shift+click** | Open a new window |
 | **Right-click** | Jump list: windows, new window, pin/unpin, move left/right, move here, minimize/restore, close |
+| **Drag** an app | Reorder: drop it where the accent line shows (left or right button) |
 | **Hover** | Live previews of the app's windows |
 | **Scroll** over an app | Cycle through its windows |
 | **⊞ button** | Left-click: app grid. Right-click: settings |
 
-Reorder apps with **right-click → Move left / Move right**. Don't drag the
-icons: the Omarchy bar treats a drag on any widget as moving the whole
-widget, and dragging it off the bar removes it. If that happens, re-run
-`./install.sh` or `omarchy plugin enable 0xesmail.taskbar`.
+**Dragging icons.** The Omarchy bar normally treats a drag on any widget as
+moving the whole widget, and dragging it off the bar removes it. Taskbar
+keeps drags on its icons for itself, so dragging reorders apps, and the
+taskbar can't be dragged off the bar by accident. To move Taskbar to another
+part of the bar, use `omarchy bar move 0xesmail.taskbar --section <left|center|right>`.
+**Move left / Move right** in the right-click menu also reorder apps.
+
+If a future Omarchy changes how the bar handles drags, left-dragging may
+move the whole widget again; right-drag still reorders apps then. If Taskbar
+ever ends up off the bar, re-run `./install.sh` or
+`omarchy plugin enable 0xesmail.taskbar`.
 
 Minimized windows go to the same `special:minimized` workspace as Omarchy's
 dock, and come back to the workspace you're on.

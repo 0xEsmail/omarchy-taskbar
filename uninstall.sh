@@ -2,8 +2,9 @@
 # Removes Taskbar and puts your bar back the way it was before Taskbar set up
 # the Windows layout. The source folder you run this from is left alone.
 #
-#   ./uninstall.sh                remove and restore the bar (asks first)
-#   ./uninstall.sh --yes          same, without asking
+#   ./uninstall.sh                remove and restore the bar (asks first; with
+#                                 no terminal to ask in, keeps the bar as is)
+#   ./uninstall.sh --yes          remove and restore the bar, without asking
 #   ./uninstall.sh --keep-layout  remove, but leave the bar as it is now
 set -euo pipefail
 
@@ -29,7 +30,10 @@ if [[ -f $SNAPSHOT && $RESTORE == ask ]]; then
     read -r -p "Put the bar back the way it was? [Y/n] " answer || answer=""
     [[ $answer =~ ^[Nn] ]] && RESTORE=no || RESTORE=yes
   else
-    RESTORE=yes
+    # Nobody to ask: restoring would throw away changes without consent, so
+    # leave the bar alone unless --yes said otherwise.
+    RESTORE=no
+    echo "No terminal to confirm in, so the bar is left as it is. Run with --yes to restore it."
   fi
 fi
 

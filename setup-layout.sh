@@ -38,6 +38,10 @@ backup_config() {
   cp "$CONFIG" "$CONFIG.bak.$(date +%s)"
 }
 
+is_bar_layout() {
+  jq -e 'type == "object" and (.layout | type == "object")' "$1" >/dev/null 2>&1
+}
+
 # Every bar section with this plugin's entry taken out.
 WITHOUT_TASKBAR='
   .layout |= with_entries(.value |= (
@@ -52,9 +56,9 @@ if [[ $MODE == "restore" ]]; then
     echo "No saved bar layout to restore."
     exit 0
   fi
-  jq -e 'type == "object" and (.layout | type == "object")' "$SNAPSHOT" >/dev/null 2>&1 ||
+  is_bar_layout "$SNAPSHOT" ||
     { echo "error: $SNAPSHOT is not a saved bar layout" >&2; exit 1; }
-  backup_config
+  backup_config || { echo "error: could not back up $CONFIG; leaving the bar alone" >&2; exit 1; }
   tmp=$(mktemp "$CONFIG.XXXXXX")
   jq --arg id "$ID" --slurpfile bar "$SNAPSHOT" ".bar = (\$bar[0] | $WITHOUT_TASKBAR)" "$CONFIG" >"$tmp" &&
     mv "$tmp" "$CONFIG" || { rm -f "$tmp"; echo "error: could not restore the bar" >&2; exit 1; }
@@ -91,12 +95,28 @@ if [[ $MODE == "apply" ]]; then
   [[ $(entry_value autoLayout) == "false" ]] && exit 0
 fi
 
-backup_config
+backup_config || { echo "error: could not back up $CONFIG; leaving the bar alone" >&2; exit 1; }
 
-# Remember the bar as it was before Taskbar touched it, once.
-if [[ ! -f $SNAPSHOT ]]; then
-  mkdir -p "$STATE_DIR"
-  jq --arg id "$ID" ".bar // {} | $WITHOUT_TASKBAR" "$CONFIG" >"$SNAPSHOT"
+# Remember the bar as it was before Taskbar touched it, once. Uninstalling
+# promises to put it back, so without a good copy nothing below may run.
+# Written to a temp file and checked before it takes the real name, so a
+# failure never leaves a half-written restore point behind.
+if [[ -f $SNAPSHOT ]]; then
+  is_bar_layout "$SNAPSHOT" ||
+    { echo "error: the saved bar at $SNAPSHOT is damaged; leaving the bar alone" >&2; exit 1; }
+else
+  tmp_snapshot=""
+  if mkdir -p "$STATE_DIR" &&
+     tmp_snapshot=$(mktemp "$STATE_DIR/.bar-before-layout.XXXXXX") &&
+     jq --arg id "$ID" ".bar // {} | $WITHOUT_TASKBAR" "$CONFIG" >"$tmp_snapshot" &&
+     is_bar_layout "$tmp_snapshot" &&
+     mv "$tmp_snapshot" "$SNAPSHOT"; then
+    :
+  else
+    [[ -n $tmp_snapshot ]] && rm -f "$tmp_snapshot"
+    echo "error: could not save the bar to $SNAPSHOT; leaving the bar alone" >&2
+    exit 1
+  fi
 fi
 
 omarchy bar position bottom

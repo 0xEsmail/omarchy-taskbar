@@ -9,7 +9,7 @@ import "TaskbarModel.js" as Model
 
 // A Windows-style taskbar that lives inside the Omarchy bar: pinned apps and
 // running apps side by side. Click to launch, focus, cycle or minimize; hover
-// for live previews; right-click for a jump list and to reorder.
+// for live previews; right-click for a jump list; drag to reorder.
 //
 // Author: 0xEsmail · MIT License · https://github.com/0xEsmail/omarchy-taskbar
 BarWidget {
@@ -227,7 +227,11 @@ BarWidget {
   ListModel { id: itemModel }
 
   onItemsChanged: syncItemModel()
-  Component.onCompleted: syncItemModel()
+  Component.onCompleted: {
+    syncItemModel()
+    root.barHost = root.findBarHost()
+    Qt.callLater(root.liftAboveBarDrag)
+  }
 
   function syncItemModel() {
     var keys = root.shownKeys()
@@ -418,9 +422,84 @@ BarWidget {
 
   // ------------------------------------------------------------- reorder
 
-  // The bar lays its own drag handler over every widget (drag to move a
-  // widget, drag off the bar to remove it), so a widget cannot drag its own
-  // items. Reordering goes through the right-click menu instead.
+  // Drag an app, with the left or right button, to move it. A click that
+  // does not move still clicks, and the right-click menu also has
+  // Move left / Move right.
+  //
+  // The bar lays a handler over every widget that takes any left-button
+  // drag, to move the widget or remove it when dragged off the bar. Taskbar
+  // lifts its own slot's widget area above that handler (liftAboveBarDrag),
+  // so its icons get their presses first. If a future bar is built
+  // differently and the lift finds nothing, left-drags go back to moving
+  // the widget, and right-drag still reorders.
+  property Item liftedArea: null
+  property Item barHost: null
+
+  // The bar slot holding this widget: the ancestor with a widgetHolder.
+  function findBarSlot() {
+    for (var p = root.parent; p; p = p.parent) {
+      if ("widgetHolder" in p && "widgetKey" in p && p.widgetHolder) return p
+    }
+    return null
+  }
+
+  // The bar's per-widget host, which moves between slots.
+  function findBarHost() {
+    for (var p = root.parent; p; p = p.parent) {
+      if ("owner" in p && "pool" in p && "activeItem" in p) return p
+    }
+    return null
+  }
+
+  function liftAboveBarDrag() {
+    var slot = root.findBarSlot()
+    var holder = slot ? slot.widgetHolder : null
+    // The widget area is the holder's parent and a sibling of the bar's drag
+    // handler; only siblings stack against each other.
+    var area = holder && holder.parent && holder.parent.parent === slot ? holder.parent : null
+    if (root.liftedArea && root.liftedArea !== area) root.liftedArea.z = 0
+    if (area) area.z = 1
+    root.liftedArea = area
+  }
+
+  Connections {
+    target: root.barHost
+    ignoreUnknownSignals: true
+    // Moved to another section: lift the new slot's area instead.
+    function onParentChanged() { Qt.callLater(root.liftAboveBarDrag) }
+  }
+
+  Component.onDestruction: if (root.liftedArea) root.liftedArea.z = 0
+
+  property int dragIndex: -1
+  property int dropIndex: -1
+  property real dragOffset: 0
+  readonly property bool dragging: dragIndex >= 0
+
+  function slotCenters() {
+    var centers = []
+    for (var i = 0; i < appRepeater.count; i++) {
+      var slot = appRepeater.itemAt(i)
+      if (slot) centers.push(root.vertical ? slot.y + slot.height / 2 : slot.x + slot.width / 2)
+    }
+    return centers
+  }
+
+  function startDrag(index) {
+    root.closeMenu()
+    root.closePreview()
+    // The landing slot first: with only the dragged slot set, every slot
+    // before it would count as in between for a moment.
+    root.dropIndex = index
+    root.dragIndex = index
+  }
+
+  function endDrag() {
+    root.dragIndex = -1
+    root.dropIndex = -1
+    root.dragOffset = 0
+  }
+
   function moveBy(key, delta) {
     var shown = root.shownKeys()
     var from = shown.indexOf(key)
@@ -486,7 +565,7 @@ BarWidget {
 
   function hoverSlot(slot) {
     previewCloseTimer.stop()
-    if (root.menuOpen) return
+    if (root.menuOpen || root.dragging) return
     var canPreview = root.previewsEnabled && slot.running
     if (root.previewOpen) {
       if (canPreview) {
@@ -515,7 +594,7 @@ BarWidget {
     interval: 400
     onTriggered: {
       var slot = root.pendingPreviewSlot
-      if (!slot || !slot.hovered || !slot.running || root.menuOpen) return
+      if (!slot || !slot.hovered || !slot.running || root.menuOpen || root.dragging) return
       root.previewSlot = slot
       root.previewOpen = true
     }
@@ -548,6 +627,13 @@ BarWidget {
   implicitWidth: root.vertical ? root.barSize : strip.implicitWidth
   implicitHeight: root.vertical ? strip.implicitHeight : root.barSize
 
+  // Takes left presses in the gaps between icons, so a stray drag there
+  // cannot pick up the whole widget and drop it off the bar.
+  MouseArea {
+    anchors.fill: parent
+    acceptedButtons: Qt.LeftButton
+  }
+
   Grid {
     id: strip
     columns: root.vertical ? 1 : appRepeater.count + 1
@@ -562,6 +648,20 @@ BarWidget {
       model: itemModel
       delegate: AppButton {}
     }
+  }
+
+  // Where a dragged app will land: a thin accent line between two slots.
+  Rectangle {
+    readonly property Item target: root.dragging && root.dropIndex !== root.dragIndex ? appRepeater.itemAt(root.dropIndex) : null
+    readonly property bool after: root.dropIndex > root.dragIndex
+    visible: !!target
+    z: 3
+    color: Commons.Color.accent
+    radius: 1
+    width: root.vertical ? root.barSize - Style.space(8) : 2
+    height: root.vertical ? 2 : root.barSize - Style.space(8)
+    x: !target ? 0 : root.vertical ? Style.space(4) : strip.x + target.x + (after ? target.width : 0) - 1
+    y: !target ? 0 : root.vertical ? strip.y + target.y + (after ? target.height : 0) - 1 : Style.space(4)
   }
 
   // ------------------------------------------------------------- buttons
@@ -670,7 +770,8 @@ BarWidget {
       return true
     }
     readonly property bool launching: root.isLaunching(key)
-    readonly property bool hovered: slotMouse.containsMouse
+    readonly property bool lifted: root.dragIndex === index
+    readonly property bool hovered: slotMouse.containsMouse && !root.dragging
     readonly property string labelText: {
       if (root.vertical || !running) return ""
       if (root.labelsMode === "all") {
@@ -683,23 +784,32 @@ BarWidget {
     readonly property bool showLabel: labelText !== ""
     property real pulse: 1
 
+    z: lifted ? 2 : 0
     width: root.vertical ? root.barSize : implicitWidth
     height: root.vertical ? implicitHeight : root.barSize
     implicitWidth: root.slotPadding * 2 + root.iconSize + (showLabel ? root.labelGap + label.width : 0)
     implicitHeight: root.iconSize + root.slotPadding * 2
 
     Behavior on implicitWidth {
+      enabled: !root.dragging
       NumberAnimation { duration: Style.duration(150); easing.type: Easing.OutCubic }
     }
 
+    // While dragged, the button's content follows the pointer; the slot
+    // itself stays put so the layout does not shift under the drag.
     Item {
       id: content
       anchors.fill: parent
+      opacity: slot.lifted ? 0.85 : 1
+      transform: Translate {
+        x: slot.lifted && !root.vertical ? root.dragOffset : 0
+        y: slot.lifted && root.vertical ? root.dragOffset : 0
+      }
 
       SlotBackground {
         hovered: slot.hovered || (root.previewOpen && root.previewSlot === slot) || root.menuSlot === slot
-        pressed: slotMouse.pressed
-        active: slot.focused
+        pressed: slotMouse.pressed && !slot.lifted
+        active: slot.focused || slot.lifted
         urgent: slot.urgent
       }
 
@@ -805,19 +915,63 @@ BarWidget {
       id: slotMouse
       anchors.fill: parent
       hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
+      cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
       acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+      // Once a drag starts, keep it even if the pointer leaves the strip.
+      preventStealing: true
 
+      readonly property int dragButtons: Qt.LeftButton | Qt.RightButton
       property real wheelAccumulator: 0
+      property point pressPoint
+      property bool dragged: false
+
+      // In the strip's coordinates, which stay still while the button's
+      // content moves, so each move is not fed back into the next.
+      function stripPoint(event) {
+        return slotMouse.mapToItem(strip, event.x, event.y)
+      }
 
       onPressed: function(event) {
         if (root.bar) root.bar.hideTooltip(slot)
         root.closePreview()
+        slotMouse.dragged = false
+        if (event.button & slotMouse.dragButtons) slotMouse.pressPoint = slotMouse.stripPoint(event)
       }
+
+      // A left- or right-button drag reorders.
+      onPositionChanged: function(event) {
+        if (!(slotMouse.pressedButtons & slotMouse.dragButtons)) return
+        var point = slotMouse.stripPoint(event)
+        var delta = root.vertical ? point.y - slotMouse.pressPoint.y : point.x - slotMouse.pressPoint.x
+        if (!root.dragging) {
+          if (Math.abs(delta) < Style.space(6)) return
+          slotMouse.dragged = true
+          root.startDrag(slot.index)
+        }
+        if (!slot.lifted) return
+        root.dragOffset = delta
+        root.dropIndex = Model.dropIndex(root.slotCenters(), slot.index, root.vertical ? point.y : point.x)
+      }
+
+      onReleased: function(event) {
+        if (!slot.lifted) return
+        var from = root.dragIndex
+        var to = root.dropIndex
+        var key = slot.key
+        root.endDrag()
+        if (to !== from) root.placeAt(key, to, false)
+      }
+
+      onCanceled: if (slot.lifted) root.endDrag()
 
       onClicked: function(event) {
         if (root.bar) root.bar.hideTooltip(slot)
         root.closePreview()
+        // A drag ends in a release over the app, which is not a click on it.
+        if (slotMouse.dragged) {
+          slotMouse.dragged = false
+          return
+        }
         if (event.button === Qt.RightButton) {
           if (root.menuSlot === slot) root.closeMenu()
           else root.openMenu(slot)

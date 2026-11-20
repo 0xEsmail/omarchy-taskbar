@@ -64,6 +64,17 @@ test("stepWindow wraps", () => {
   assert.strictEqual(M.stepWindow([{}, {}], -1), 1)
 })
 
+test("dropIndex: where a dragged button lands", () => {
+  const centers = [10, 30, 50, 70]
+  assert.strictEqual(M.dropIndex(centers, 0, 5), 0)    // still before its own center
+  assert.strictEqual(M.dropIndex(centers, 0, 40), 1)   // past the next center
+  assert.strictEqual(M.dropIndex(centers, 0, 100), 3)  // past the end
+  assert.strictEqual(M.dropIndex(centers, 3, 0), 0)    // to the front
+  assert.strictEqual(M.dropIndex(centers, 2, 45), 2)   // not yet past a neighbour
+  assert.strictEqual(M.dropIndex(centers, 2, 25), 1)   // past the left neighbour
+  assert.strictEqual(M.dropIndex([], 0, 5), 0)
+})
+
 test("orderWithKeyAt moves a key", () => {
   assert.deepStrictEqual(M.orderWithKeyAt(["a", "b", "c"], "a", 2), ["b", "c", "a"])
   assert.deepStrictEqual(M.orderWithKeyAt(["a", "b", "c"], "c", 0), ["c", "a", "b"])

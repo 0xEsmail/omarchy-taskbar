@@ -20,7 +20,7 @@
   "menu.close": "Close window",
   "menu.closeAll": { "one": "Close window", "other": "Close all %1 windows" },
   "settings.title": "Taskbar",
-  "settings.hint": "Right-click an app to move it · scroll to cycle windows",
+  "settings.hint": "Drag an app to move it · scroll to cycle windows",
   "settings.labels": "WINDOW TITLES",
   "settings.labelsNone": "Icons only",
   "settings.labelsFocused": "Focused app",
